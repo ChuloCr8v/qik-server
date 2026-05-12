@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum UserStatus {
+  ACTIVE
+  AWAY
+  INACTIVE
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum PlanName {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  INVITE
+}
+
+model User {
+  id                 String         @id @default(cuid())
+  email              String         @unique
+  googleId           String?        @unique
+  emailVerified      Boolean        @default(false)
+  displayName        String
+  photoUrl           String?
+  bio                String?
+  jobTitle           String?
+  role               UserRole       @default(MEMBER)
+  status             UserStatus     @default(ACTIVE)
+  plan               PlanName       @default(FREE)
+  subscriptionStatus String?
+  subscriptionDate   DateTime?
+  notifyEmail        Boolean        @default(true)
+  notifyReminders    Boolean        @default(true)
+  notifyAiCoach      Boolean        @default(false)
+  meetings           Meeting[]      @relation("MeetingOwner")
+  participants       Participant[]
+  templates          Template[]
+  notifications      Notification[]
+  invitations        Invitation[]   @relation("InvitationSender")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model LoginCode {
+  id        String    @id @default(cuid())
+  email     String
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+}
+
+model Meeting {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  ownerId         String
+  owner           User          @relation("MeetingOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  scheduledAt     DateTime?
+  invitees        String[]      @default([])
+  isPublic        Boolean       @default(false)
+  status          MeetingStatus @default(SCHEDULED)
+  isActive        Boolean       @default(false)
+  activeItemIndex Int           @default(0)
+  isPaused        Boolean       @default(false)
+  startedAt       DateTime?
+  agenda          AgendaItem[]
+  participants    Participant[]
+  invitations     Invitation[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model AgendaItem {
+  id          String   @id @default(cuid())
+  meetingId   String
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  duration    Int
+  order       Int
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Participant {
+  id          String   @id @default(cuid())
+  meetingId   String
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  photoUrl    String?
+  lastSeen    DateTime @default(now())
+
+  @@unique([meetingId, userId])
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  items       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+model Invitation {
+  id        String   @id @default(cuid())
+  email     String
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  invitedBy String
+  sender    User     @relation("InvitationSender", fields: [invitedBy], references: [id], onDelete: Cascade)
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+}
