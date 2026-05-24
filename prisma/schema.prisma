@@ -38,6 +38,35 @@ enum NotificationType {
   INVITE
 }
 
+enum PlanType {
+  Free
+  Organisation
+  OrganisationPlus
+}
+
+enum PlanStatus {
+  active
+  expired
+  cancelled
+  trial
+  past_due
+}
+
+enum BillingCycle {
+  monthly
+  yearly
+  lifetime
+}
+
+enum UsageFeature {
+  AI_GENERATION
+  MEETING_CREATED
+  MEMBER_INVITED
+  TASK_CREATED
+  DECISION_CREATED
+  EXPORT_PDF
+}
+
 model User {
   id                 String         @id @default(cuid())
   email              String         @unique
@@ -60,8 +89,60 @@ model User {
   templates          Template[]
   notifications      Notification[]
   invitations        Invitation[]   @relation("InvitationSender")
+  billingPlan        Plan?
+  usageLogs          UsageLog[]
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
+}
+
+model Plan {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type           PlanType      @default(Free)
+  status         PlanStatus    @default(active)
+  billingCycle   BillingCycle  @default(monthly)
+
+  startDate      DateTime      @default(now())
+  expiresAt      DateTime?
+  cancelledAt    DateTime?
+  trialEndsAt    DateTime?
+
+  adminUserId    String?
+
+  aiGenerationsLimit       Int?
+  memberAiGenerationsLimit Int?
+  teamMembersLimit         Int?
+
+  tasksEnabled      Boolean   @default(false)
+  decisionsEnabled  Boolean   @default(false)
+  dashboardEnabled  Boolean   @default(false)
+
+  metadata       Json?
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  usageLogs      UsageLog[]
+}
+
+model UsageLog {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId    String?
+  plan      Plan?        @relation(fields: [planId], references: [id])
+
+  feature   UsageFeature
+  metadata  Json?
+
+  createdAt DateTime     @default(now())
+
+  @@index([userId])
+  @@index([userId, feature])
+  @@index([planId])
+  @@index([createdAt])
 }
 
 model LoginCode {

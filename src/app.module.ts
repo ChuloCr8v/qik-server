@@ -26,6 +26,11 @@ import {
   NotificationsModule
 } from './notifications/notifications.module';
 import { ConfigModule } from '@nestjs/config';
+import { AiModule } from './ai/ai.module';
+import { BillingModule } from './billing/billing.module';
+import { PlanModule } from './plan/plan.module';
+import { TeamModule } from './team/team.module';
+import { UsageModule } from './usage/usage.module';
 
 @Module( {
   imports: [
@@ -46,6 +51,11 @@ import { ConfigModule } from '@nestjs/config';
     AgendaModule,
     TemplatesModule,
     NotificationsModule,
+    PlanModule,
+    UsageModule,
+    BillingModule,
+    TeamModule,
+    AiModule,
   ],
 })
 export class AppModule {}

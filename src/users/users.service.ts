@@ -7,7 +7,10 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMe(userId: string) {
-    const user = await this.ensureAnimeAvatar(await this.prisma.user.findUniqueOrThrow({ where: { id: userId } }));
+    const user = await this.ensureAnimeAvatar(await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      include: { billingPlan: true },
+    }));
     return this.serializeUser(user);
   }
 
@@ -69,7 +72,7 @@ export class UsersService {
       jobTitle: user.jobTitle,
       role: this.titleCase(user.role),
       status: this.titleCase(user.status),
-      plan: this.titleCase(user.plan),
+      plan: user.billingPlan?.type || this.titleCase(user.plan),
       subscriptionStatus: user.subscriptionStatus,
       subscriptionDate: user.subscriptionDate,
       notifications: {
