@@ -1,8 +1,20 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MeetingStatus } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { getAnimeAvatar } from '../common/avatar';
-import { MailService } from '../mail/mail.service';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException
+} from '@nestjs/common';
+import {
+  MeetingStatus
+} from '@prisma/client';
+import {
+  PrismaService
+} from '../prisma/prisma.service';
+import {
+  getAnimeAvatar
+} from '../common/avatar';
+import {
+  MailService
+} from '../mail/mail.service';
 
 @Injectable()
 export class MeetingsService {
@@ -12,26 +24,53 @@ export class MeetingsService {
   ) {}
 
   async list(userId: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: {
+        id: userId
+      }
+    });
     const meetings = await this.prisma.meeting.findMany({
       where: {
-        OR: [
-          { ownerId: userId },
-          { participants: { some: { userId } } },
-          ...(user.email ? [{ invitees: { has: user.email } }] : []),
+        OR: [{
+          ownerId: userId
+        },
+          {
+            participants: {
+              some: {
+                userId
+              }
+            }
+          },
+          ...(user.email ? [{
+            invitees: {
+              has: user.email
+            }
+          }]: []),
         ],
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc'
+      },
     });
     return meetings.map(meeting => this.serializeMeeting(meeting));
   }
 
   async publicSummary(id: string) {
     const meeting = await this.prisma.meeting.findUnique({
-      where: { id },
+      where: {
+        id
+      },
       include: {
-        owner: { select: { displayName: true } },
-        agenda: { select: { duration: true } },
+        owner: {
+          select: {
+            displayName: true
+          }
+        },
+        agenda: {
+          select: {
+            duration: true
+          }
+        },
       },
     });
     if (!meeting) throw new NotFoundException('Meeting not found');
@@ -57,7 +96,7 @@ export class MeetingsService {
         title: body.title || template?.name || 'Untitled Meeting',
         description: body.description || template?.description || '',
         ownerId: userId,
-        scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : undefined,
+        scheduledAt: body.scheduledAt ? new Date(body.scheduledAt): undefined,
         invitees: body.invitees || [],
         isPublic: body.isPublic,
         agenda: template?.items?.length ? {
@@ -67,7 +106,7 @@ export class MeetingsService {
             duration: Number(item.duration || 5),
             order: index,
           })),
-        } : undefined,
+        }: undefined,
       },
     });
     await this.createNotification(userId, 'Meeting Created', `Your meeting "${meeting.title}" is ready.`, 'SUCCESS');
@@ -82,11 +121,13 @@ export class MeetingsService {
   async update(userId: string, id: string, body: any) {
     await this.findAccessibleMeeting(userId, id);
     const meeting = await this.prisma.meeting.update({
-      where: { id },
+      where: {
+        id
+      },
       data: {
         title: body.title,
         description: body.description,
-        scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : undefined,
+        scheduledAt: body.scheduledAt ? new Date(body.scheduledAt): undefined,
         invitees: body.invitees,
         isPublic: body.isPublic,
       },
@@ -96,15 +137,25 @@ export class MeetingsService {
 
   async remove(userId: string, id: string) {
     await this.findOwnedMeeting(userId, id);
-    await this.prisma.meeting.delete({ where: { id } });
-    return { ok: true };
+    await this.prisma.meeting.delete({
+      where: {
+        id
+      }
+    });
+    return {
+      ok: true
+    };
   }
 
   async start(userId: string, id: string) {
     await this.findOwnedMeeting(userId, id);
     const meeting = await this.prisma.meeting.update({
-      where: { id },
-      data: { status: MeetingStatus.ACTIVE, isActive: true, isPaused: false, activeItemIndex: 0, startedAt: new Date() },
+      where: {
+        id
+      },
+      data: {
+        status: MeetingStatus.ACTIVE, isActive: true, isPaused: false, activeItemIndex: 0, startedAt: new Date()
+      },
     });
     return this.serializeMeeting(meeting);
   }
@@ -112,26 +163,41 @@ export class MeetingsService {
   async stop(userId: string, id: string) {
     await this.findOwnedMeeting(userId, id);
     const meeting = await this.prisma.meeting.update({
-      where: { id },
-      data: { status: MeetingStatus.COMPLETED, isActive: false, isPaused: false },
+      where: {
+        id
+      },
+      data: {
+        status: MeetingStatus.COMPLETED, isActive: false, isPaused: false
+      },
     });
     return this.serializeMeeting(meeting);
   }
 
-  async sendInvite(userId: string, id: string, body: { email: string }) {
+  async sendInvite(userId: string, id: string, body: {
+    email: string
+  }) {
     const email = body.email?.trim().toLowerCase();
     if (!this.isValidEmail(email)) {
       throw new BadRequestException('A valid invitee email is required.');
     }
 
-    const [owner, currentMeeting] = await Promise.all([
-      this.prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-      this.findOwnedMeeting(userId, id),
-    ]);
+    const [owner,
+      currentMeeting] = await Promise.all([
+        this.prisma.user.findUniqueOrThrow({
+          where: {
+            id: userId
+          }
+        }),
+        this.findOwnedMeeting(userId, id),
+      ]);
     const invitees = Array.from(new Set([...(currentMeeting.invitees || []), email]));
     const meeting = await this.prisma.meeting.update({
-      where: { id },
-      data: { invitees },
+      where: {
+        id
+      },
+      data: {
+        invitees
+      },
     });
 
     await this.prisma.invitation.create({
@@ -150,7 +216,10 @@ export class MeetingsService {
       scheduledAt: meeting.scheduledAt,
     });
 
-    return { ok: true, meeting: this.serializeMeeting(meeting) };
+    return {
+      ok: true,
+      meeting: this.serializeMeeting(meeting)
+    };
   }
 
   async sendReminders(userId: string, id: string) {
@@ -171,18 +240,23 @@ export class MeetingsService {
       ),
     );
 
-    return { ok: true, sent: invitees.length };
+    return {
+      ok: true,
+      sent: invitees.length
+    };
   }
 
   async updateProgress(userId: string, id: string, body: any) {
     await this.findAccessibleMeeting(userId, id);
     const meeting = await this.prisma.meeting.update({
-      where: { id },
+      where: {
+        id
+      },
       data: {
         activeItemIndex: body.activeItemIndex,
         isPaused: body.isPaused,
-        startedAt: body.startedAt ? new Date(body.startedAt) : body.startedAt === null ? null : undefined,
-        scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : undefined,
+        startedAt: body.startedAt ? new Date(body.startedAt): body.startedAt === null ? null: undefined,
+        scheduledAt: body.scheduledAt ? new Date(body.scheduledAt): undefined,
       },
     });
     return this.serializeMeeting(meeting);
@@ -190,45 +264,93 @@ export class MeetingsService {
 
   async updatePresence(userId: string, meetingId: string) {
     await this.findAccessibleMeeting(userId, meetingId);
-    const user = await this.ensureAnimeAvatar(await this.prisma.user.findUniqueOrThrow({ where: { id: userId } }));
+    const user = await this.ensureAnimeAvatar(await this.prisma.user.findUniqueOrThrow({
+      where: {
+        id: userId
+      }
+    }));
     const participant = await this.prisma.participant.upsert({
-      where: { meetingId_userId: { meetingId, userId } },
-      update: { lastSeen: new Date(), displayName: user.displayName, photoUrl: user.photoUrl },
-      create: { meetingId, userId, displayName: user.displayName, photoUrl: user.photoUrl },
+      where: {
+        meetingId_userId: {
+          meetingId, userId
+        }
+      },
+      update: {
+        lastSeen: new Date(), displayName: user.displayName, photoUrl: user.photoUrl
+      },
+      create: {
+        meetingId, userId, displayName: user.displayName, photoUrl: user.photoUrl
+      },
     });
     return this.serializeParticipant(participant);
   }
 
   async leave(userId: string, meetingId: string) {
-    await this.prisma.participant.deleteMany({ where: { meetingId, userId } });
-    return { ok: true };
+    await this.prisma.participant.deleteMany({
+      where: {
+        meetingId, userId
+      }
+    });
+    return {
+      ok: true
+    };
   }
 
   async participants(userId: string, meetingId: string) {
     await this.findAccessibleMeeting(userId, meetingId);
-    const participants = await this.prisma.participant.findMany({ where: { meetingId }, orderBy: { lastSeen: 'desc' } });
+    const participants = await this.prisma.participant.findMany({
+      where: {
+        meetingId
+      }, orderBy: {
+        lastSeen: 'desc'
+      }
+    });
     return participants.map(participant => this.serializeParticipant(participant));
   }
 
   private async findAccessibleMeeting(userId: string, id: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: {
+        id: userId
+      }
+    });
     const meeting = await this.prisma.meeting.findFirst({
       where: {
         id,
-        OR: [
-          { ownerId: userId },
-          { participants: { some: { userId } } },
-          { isPublic: true },
-          ...(user.email ? [{ invitees: { has: user.email } }] : []),
+        OR: [{
+          ownerId: userId
+        },
+          {
+            participants: {
+              some: {
+                userId
+              }
+            }
+          },
+          {
+            isPublic: true
+          },
+          ...(user.email ? [{
+            invitees: {
+              has: user.email
+            }
+          }]: []),
         ],
       },
+      include: {
+        owner: true
+      }
     });
     if (!meeting) throw new NotFoundException('Meeting not found');
     return meeting;
   }
 
   private async findOwnedMeeting(userId: string, id: string) {
-    const meeting = await this.prisma.meeting.findFirst({ where: { id, ownerId: userId } });
+    const meeting = await this.prisma.meeting.findFirst({
+      where: {
+        id, ownerId: userId
+      }
+    });
     if (!meeting) throw new NotFoundException('Meeting not found');
     return meeting;
   }
@@ -245,7 +367,11 @@ export class MeetingsService {
   }
 
   private createNotification(userId: string, title: string, message: string, type: any) {
-    return this.prisma.notification.create({ data: { userId, title, message, type } });
+    return this.prisma.notification.create({
+      data: {
+        userId, title, message, type
+      }
+    });
   }
 
   private serializeMeeting(meeting: any) {
@@ -254,6 +380,7 @@ export class MeetingsService {
       title: meeting.title,
       description: meeting.description,
       ownerId: meeting.ownerId,
+      owner: meeting.owner,
       scheduledAt: meeting.scheduledAt?.toISOString(),
       invitees: meeting.invitees,
       isPublic: meeting.isPublic,
@@ -282,8 +409,12 @@ export class MeetingsService {
     }
 
     return this.prisma.user.update({
-      where: { id: user.id },
-      data: { photoUrl: getAnimeAvatar(user.email || user.id) },
+      where: {
+        id: user.id
+      },
+      data: {
+        photoUrl: getAnimeAvatar(user.email || user.id)
+      },
     });
   }
 }

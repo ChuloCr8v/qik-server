@@ -43,7 +43,7 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendSignInCode({ to: email, code, expiresInMinutes });
+   // await this.mailService.sendSignInCode({ to: email, code, expiresInMinutes });
 
     return {
       ok: true,
