@@ -31,6 +31,7 @@ import { BillingModule } from './billing/billing.module';
 import { PlanModule } from './plan/plan.module';
 import { TeamModule } from './team/team.module';
 import { UsageModule } from './usage/usage.module';
+import { getJwtSecret } from './config/env';
 
 @Module( {
   imports: [
@@ -39,7 +40,7 @@ import { UsageModule } from './usage/usage.module';
     }),
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET || 'dev-secret',
+      secret: getJwtSecret(),
       signOptions: {
         expiresIn: '7d'
       },

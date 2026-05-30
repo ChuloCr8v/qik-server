@@ -28,6 +28,12 @@ export class MeetingsController {
     return this.meetingsService.create(user.id, body);
   }
 
+  @Get('dashboard/stats')
+  dashboardStats(@CurrentUser() user: AuthUser) {
+    return this.meetingsService.dashboardStats(user.id);
+  }
+
+
   @Get(':id')
   get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.meetingsService.get(user.id, id);

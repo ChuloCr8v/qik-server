@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PlanType } from '@prisma/client';
+import { PlanStatus, PlanType, Prisma } from '@prisma/client';
 import { PLAN_LIMITS, PlanName } from '../config/plans';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -36,17 +36,19 @@ export class PlanService {
 
   async getEffectiveLimits(userId: string) {
     const plan = await this.getUserPlan(userId);
-    const defaults = PLAN_LIMITS[plan.type as PlanName];
+    const isEntitled = plan.status === 'active' || plan.status === 'trial';
+    const effectiveType = isEntitled ? plan.type : PlanType.Free;
+    const defaults = PLAN_LIMITS[effectiveType as PlanName];
 
     return {
       plan,
       limits: {
-        aiGenerations: plan.aiGenerationsLimit ?? defaults.aiGenerations,
-        memberAiGenerations: plan.memberAiGenerationsLimit ?? defaults.memberAiGenerations,
-        teamMembers: plan.teamMembersLimit ?? defaults.teamMembers,
-        tasksEnabled: plan.tasksEnabled,
-        decisionsEnabled: plan.decisionsEnabled,
-        dashboardEnabled: plan.dashboardEnabled,
+        aiGenerations: isEntitled ? plan.aiGenerationsLimit ?? defaults.aiGenerations : defaults.aiGenerations,
+        memberAiGenerations: isEntitled ? plan.memberAiGenerationsLimit ?? defaults.memberAiGenerations : defaults.memberAiGenerations,
+        teamMembers: isEntitled ? plan.teamMembersLimit ?? defaults.teamMembers : defaults.teamMembers,
+        tasksEnabled: isEntitled ? plan.tasksEnabled : defaults.tasksEnabled,
+        decisionsEnabled: isEntitled ? plan.decisionsEnabled : defaults.decisionsEnabled,
+        dashboardEnabled: isEntitled ? plan.dashboardEnabled : defaults.dashboardEnabled,
         guestInvites: defaults.guestInvites,
         features: defaults.features,
       },
@@ -54,17 +56,21 @@ export class PlanService {
   }
 
   async upgradePlan(userId: string, planType: PlanType) {
+    return this.applyPlanToUser(userId, planType, 'active');
+  }
+
+  async applyPlanToUser(userId: string, planType: PlanType, status: PlanStatus = 'active', metadata?: Prisma.InputJsonObject) {
     const limits = PLAN_LIMITS[planType as PlanName];
 
     return this.prisma.plan.upsert({
       where: { userId },
       update: {
         type: planType,
-        status: 'active',
+        status,
         billingCycle: 'monthly',
         startDate: new Date(),
-        expiresAt: null,
-        cancelledAt: null,
+        expiresAt: status === 'active' || status === 'trial' ? null : new Date(),
+        cancelledAt: status === 'cancelled' ? new Date() : null,
         adminUserId: userId,
         aiGenerationsLimit: toStoredLimit(limits.aiGenerations),
         memberAiGenerationsLimit: limits.memberAiGenerations,
@@ -72,11 +78,12 @@ export class PlanService {
         tasksEnabled: limits.tasksEnabled,
         decisionsEnabled: limits.decisionsEnabled,
         dashboardEnabled: limits.dashboardEnabled,
+        metadata,
       },
       create: {
         userId,
         type: planType,
-        status: 'active',
+        status,
         billingCycle: 'monthly',
         adminUserId: userId,
         aiGenerationsLimit: toStoredLimit(limits.aiGenerations),
@@ -85,7 +92,31 @@ export class PlanService {
         tasksEnabled: limits.tasksEnabled,
         decisionsEnabled: limits.decisionsEnabled,
         dashboardEnabled: limits.dashboardEnabled,
+        metadata,
       },
     });
+  }
+
+  async updatePlanMetadata(userId: string, metadata: Prisma.InputJsonObject) {
+    const plan = await this.getUserPlan(userId);
+    return this.prisma.plan.update({
+      where: { id: plan.id },
+      data: {
+        metadata: {
+          ...((plan.metadata as Record<string, unknown> | null) || {}),
+          ...metadata,
+        } as Prisma.InputJsonObject,
+      },
+    });
+  }
+
+  async findByStripeCustomer(stripeCustomerId: string) {
+    const plans = await this.prisma.plan.findMany();
+    return plans.find(plan => (plan.metadata as any)?.stripeCustomerId === stripeCustomerId) || null;
+  }
+
+  async findByStripeSubscription(stripeSubscriptionId: string) {
+    const plans = await this.prisma.plan.findMany();
+    return plans.find(plan => (plan.metadata as any)?.stripeSubscriptionId === stripeSubscriptionId) || null;
   }
 }

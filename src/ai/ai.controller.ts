@@ -14,4 +14,10 @@ export class AiController {
   generateAgenda(@CurrentUser() user: AuthUser, @Body() body: any) {
     return this.aiService.generateAgenda(user.id, body);
   }
+
+  @Post('agenda/analyze')
+  @UseGuards(PlanGuard)
+  analyzeAgenda(@Body() body: any) {
+    return this.aiService.analyzeAgenda(body);
+  }
 }

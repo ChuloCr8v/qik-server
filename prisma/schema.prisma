@@ -40,6 +40,7 @@ enum NotificationType {
 
 enum PlanType {
   Free
+  Individual
   Organisation
   OrganisationPlus
 }

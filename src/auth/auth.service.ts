@@ -4,6 +4,7 @@ import { createHash, randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { getAnimeAvatar } from '../common/avatar';
+import { getJwtSecret } from '../config/env';
 
 type GoogleTokenInfo = {
   aud?: string;
@@ -154,7 +155,7 @@ export class AuthService {
   }
 
   private hashCode(email: string, code: string) {
-    const secret = process.env.JWT_SECRET || 'dev-secret';
+    const secret = getJwtSecret();
     return createHash('sha256').update(`${email}:${code}:${secret}`).digest('hex');
   }
 
