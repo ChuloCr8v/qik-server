@@ -32,6 +32,8 @@ import { PlanModule } from './plan/plan.module';
 import { TeamModule } from './team/team.module';
 import { UsageModule } from './usage/usage.module';
 import { getJwtSecret } from './config/env';
+import { HealthController } from './health.controller';
+import { AdminModule } from './admin/admin.module';
 
 @Module( {
   imports: [
@@ -57,6 +59,8 @@ import { getJwtSecret } from './config/env';
     BillingModule,
     TeamModule,
     AiModule,
+    AdminModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

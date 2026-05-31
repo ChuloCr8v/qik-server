@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { PlanType, UsageFeature, UserRole } from '@prisma/client';
+import { OrgRole, PlanType, UsageFeature } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanService } from '../plan/plan.service';
 import { UsageService } from '../usage/usage.service';
+import { isValidEmail, normalizeEmail } from '../common/email';
 
 @Injectable()
 export class TeamService {
@@ -13,8 +14,8 @@ export class TeamService {
   ) {}
 
   async invitePermanentMember(userId: string, body: { email: string; role?: string }) {
-    const email = body.email?.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const email = normalizeEmail(body.email);
+    if (!isValidEmail(email)) {
       throw new BadRequestException('A valid team member email is required.');
     }
 
@@ -36,7 +37,15 @@ export class TeamService {
       throw new ForbiddenException('You have reached your team member limit. Please upgrade your plan.');
     }
 
-    const invitedUser = await this.prisma.user.findUnique({ where: { email } });
+    const invitedUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { normalizedEmail: email },
+          { email: { equals: email, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
     if (invitedUser && invitedUser.id !== adminUserId) {
       await this.prisma.plan.upsert({
         where: { userId: invitedUser.id },
@@ -68,7 +77,7 @@ export class TeamService {
       });
       await this.prisma.user.update({
         where: { id: invitedUser.id },
-        data: { role: body.role === 'Admin' ? UserRole.ADMIN : UserRole.MEMBER },
+        data: { orgRole: body.role === 'Admin' ? OrgRole.ADMIN : OrgRole.MEMBER },
       });
     }
 

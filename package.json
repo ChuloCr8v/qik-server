@@ -10,7 +10,12 @@
     "lint": "tsc --noEmit",
     "prisma": "prisma",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "prisma:seed": "node prisma/seed.js",
+    "prisma:dedupe-users": "node prisma/dedupe-users.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.9",
