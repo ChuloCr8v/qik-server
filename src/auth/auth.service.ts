@@ -1,9 +1,24 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { createHash, randomInt } from 'crypto';
-import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
-import { getAnimeAvatar } from '../common/avatar';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException
+} from '@nestjs/common';
+import {
+  JwtService
+} from '@nestjs/jwt';
+import {
+  createHash,
+  randomInt
+} from 'crypto';
+import {
+  PrismaService
+} from '../prisma/prisma.service';
+import {
+  MailService
+} from '../mail/mail.service';
+import {
+  getAnimeAvatar
+} from '../common/avatar';
 
 type GoogleTokenInfo = {
   aud?: string;
@@ -22,37 +37,49 @@ export class AuthService {
     private readonly mailService: MailService,
   ) {}
 
-  async startEmailSignIn(input: { email: string }) {
-    const email = input.email?.trim().toLowerCase();
-    if (!this.isValidEmail(email)) {
-      throw new BadRequestException('A valid email address is required.');
-    }
+  async startEmailSignIn(input: {
+    email: string
+  }) {
 
-    await this.cleanupLoginCodes(email);
+    try {
+      const email = input.email?.trim().toLowerCase();
+      if (!this.isValidEmail(email)) {
+        throw new BadRequestException('A valid email address is required.');
+      }
 
-    const expiresInMinutes = 10;
-    const code = randomInt(100000, 1000000).toString();
-    const codeHash = this.hashCode(email, code);
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+      await this.cleanupLoginCodes(email);
 
-    await this.prisma.loginCode.create({
-      data: {
-        email,
-        codeHash,
-        expiresAt,
-      },
-    });
+      const expiresInMinutes = 10;
+      const code = randomInt(100000, 1000000).toString();
+      const codeHash = this.hashCode(email, code);
+      const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
 
-   // await this.mailService.sendSignInCode({ to: email, code, expiresInMinutes });
+      await this.prisma.loginCode.create({
+        data: {
+          email,
+          codeHash,
+          expiresAt,
+        },
+      });
 
-    return {
-      ok: true,
-      message: 'Sign-in code sent.',
-      ...(this.shouldExposeDevCode() ? { devCode: code } : {}),
-    };
+      await this.mailService.sendSignInCode({
+        to: email, code, expiresInMinutes
+      });
+
+      return {
+        ok: true,
+        message: 'Sign-in code sent.',
+        ...(this.shouldExposeDevCode() ? {
+          devCode: code
+        }: {}),
+      };
+    } catch {
+      e => console.log(e)}
   }
 
-  async verifyEmailSignIn(input: { email: string; code: string }) {
+  async verifyEmailSignIn(input: {
+    email: string; code: string
+  }) {
     const email = input.email?.trim().toLowerCase();
     const code = input.code?.trim();
     if (!this.isValidEmail(email) || !code) {
@@ -60,21 +87,31 @@ export class AuthService {
     }
 
     const loginCode = await this.prisma.loginCode.findUnique({
-      where: { codeHash: this.hashCode(email, code) },
+      where: {
+        codeHash: this.hashCode(email, code)
+      },
     });
     if (!loginCode || loginCode.email !== email || loginCode.usedAt || loginCode.expiresAt < new Date()) {
       throw new UnauthorizedException('Invalid or expired sign-in code.');
     }
 
     await this.prisma.loginCode.update({
-      where: { id: loginCode.id },
-      data: { usedAt: new Date() },
+      where: {
+        id: loginCode.id
+      },
+      data: {
+        usedAt: new Date()
+      },
     });
     await this.cleanupLoginCodes(email);
 
     const user = await this.prisma.user.upsert({
-      where: { email },
-      update: { emailVerified: true },
+      where: {
+        email
+      },
+      update: {
+        emailVerified: true
+      },
       create: {
         email,
         emailVerified: true,
@@ -86,7 +123,10 @@ export class AuthService {
     return this.authResponse(await this.ensureAnimeAvatar(user));
   }
 
-  async googleSignIn(input: { credential: string }) {
+  async googleSignIn(input: {
+    credential: string
+  }) {
+    try {
     const credential = input.credential?.trim();
     if (!credential) {
       throw new BadRequestException('Google credential is required.');
@@ -99,7 +139,9 @@ export class AuthService {
 
     const email = profile.email.trim().toLowerCase();
     const user = await this.prisma.user.upsert({
-      where: { email },
+      where: {
+        email
+      },
       update: {
         googleId: profile.sub,
         emailVerified: true,
@@ -114,16 +156,26 @@ export class AuthService {
       },
     });
     return this.authResponse(await this.ensureAnimeAvatar(user));
+    } catch{e => console.log(e)}
   }
 
   async me(userId: string) {
-    const user = await this.ensureAnimeAvatar(await this.prisma.user.findUniqueOrThrow({ where: { id: userId } }));
+    const user = await this.ensureAnimeAvatar(await this.prisma.user.findUniqueOrThrow({
+      where: {
+        id: userId
+      }
+    }));
     return this.serializeUser(user);
   }
 
   private authResponse(user: any) {
-    const token = this.jwtService.sign({ id: user.id, email: user.email });
-    return { token, user: this.serializeUser(user) };
+    const token = this.jwtService.sign({
+      id: user.id, email: user.email
+    });
+    return {
+      token,
+      user: this.serializeUser(user)
+    };
   }
 
   private serializeUser(user: any) {
@@ -150,7 +202,7 @@ export class AuthService {
   }
 
   private titleCase(value?: string) {
-    return value ? value.charAt(0) + value.slice(1).toLowerCase() : value;
+    return value ? value.charAt(0) + value.slice(1).toLowerCase(): value;
   }
 
   private hashCode(email: string, code: string) {
@@ -168,8 +220,12 @@ export class AuthService {
     }
 
     return this.prisma.user.update({
-      where: { id: user.id },
-      data: { photoUrl: getAnimeAvatar(user.email || user.id) },
+      where: {
+        id: user.id
+      },
+      data: {
+        photoUrl: getAnimeAvatar(user.email || user.id)
+      },
     });
   }
 
@@ -184,10 +240,19 @@ export class AuthService {
   private async cleanupLoginCodes(email?: string) {
     await this.prisma.loginCode.deleteMany({
       where: {
-        OR: [
-          { expiresAt: { lt: new Date() } },
-          { usedAt: { not: null } },
-          ...(email ? [{ email, usedAt: null }] : []),
+        OR: [{
+          expiresAt: {
+            lt: new Date()
+          }
+        },
+          {
+            usedAt: {
+              not: null
+            }
+          },
+          ...(email ? [{
+            email, usedAt: null
+          }]: []),
         ],
       },
     });
