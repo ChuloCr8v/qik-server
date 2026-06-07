@@ -71,6 +71,7 @@ export class UsersService {
       bio: user.bio,
       jobTitle: user.jobTitle,
       role: this.titleCase(user.role),
+      orgRole: this.titleCase(user.orgRole),
       status: this.titleCase(user.status),
       plan: user.billingPlan?.type || this.titleCase(user.plan),
       subscriptionStatus: user.subscriptionStatus,

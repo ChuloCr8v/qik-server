@@ -10,7 +10,12 @@
     "lint": "tsc --noEmit",
     "prisma": "prisma",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "prisma:seed": "node prisma/seed.js",
+    "prisma:dedupe-users": "node prisma/dedupe-users.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.9",
@@ -23,7 +28,8 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "stripe": "^20.4.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.14",

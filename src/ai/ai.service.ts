@@ -11,6 +11,12 @@ export interface GeneratedAgendaItem {
   description: string;
 }
 
+interface AgendaAnalysisItem {
+  title: string;
+  duration: number;
+  description?: string;
+}
+
 @Injectable()
 export class AiService {
   constructor(
@@ -61,6 +67,36 @@ Return JSON in this exact shape:
     });
 
     return { agenda };
+  }
+
+  async analyzeAgenda(body: { meetingTitle: string; agendaItems: AgendaAnalysisItem[] }) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      throw new Error('Missing GROQ_API_KEY. Add it to your server environment before using AI features.');
+    }
+
+    const agendaText = (body.agendaItems || [])
+      .map(item => `- ${item.title} (${item.duration}m): ${item.description || 'No description'}`)
+      .join('\n');
+
+    const analysis = await this.createChatCompletion(apiKey, [
+      {
+        role: 'system',
+        content: 'You are an expert meeting facilitator. Keep feedback concise and actionable.',
+      },
+      {
+        role: 'user',
+        content: `Review the following meeting agenda and suggest 3 specific improvements or missing topics that would make the meeting more effective.
+
+Meeting Title: ${body.meetingTitle}
+Current Agenda:
+${agendaText}
+
+Provide your feedback in short, actionable bullet points.`,
+      },
+    ], false);
+
+    return { analysis: analysis || 'No suggestions at this time.' };
   }
 
   private async createChatCompletion(

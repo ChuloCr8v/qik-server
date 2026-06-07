@@ -8,6 +8,12 @@ datasource db {
 }
 
 enum UserRole {
+  SUPERADMIN
+  ADMIN
+  MEMBER
+}
+
+enum OrgRole {
   OWNER
   ADMIN
   MEMBER
@@ -40,6 +46,7 @@ enum NotificationType {
 
 enum PlanType {
   Free
+  Individual
   Organisation
   OrganisationPlus
 }
@@ -70,6 +77,7 @@ enum UsageFeature {
 model User {
   id                 String         @id @default(cuid())
   email              String         @unique
+  normalizedEmail    String?        @unique
   googleId           String?        @unique
   emailVerified      Boolean        @default(false)
   displayName        String
@@ -77,6 +85,7 @@ model User {
   bio                String?
   jobTitle           String?
   role               UserRole       @default(MEMBER)
+  orgRole            OrgRole        @default(MEMBER)
   status             UserStatus     @default(ACTIVE)
   plan               PlanName       @default(FREE)
   subscriptionStatus String?
@@ -91,6 +100,7 @@ model User {
   invitations        Invitation[]   @relation("InvitationSender")
   billingPlan        Plan?
   usageLogs          UsageLog[]
+  adminAuditLogs     AdminAuditLog[] @relation("AdminActor")
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 }
@@ -234,4 +244,21 @@ model Invitation {
   sender    User     @relation("InvitationSender", fields: [invitedBy], references: [id], onDelete: Cascade)
   status    String   @default("pending")
   createdAt DateTime @default(now())
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  actorId     String
+  actor       User     @relation("AdminActor", fields: [actorId], references: [id], onDelete: Cascade)
+  action      String
+  targetType  String
+  targetId    String
+  before      Json?
+  after       Json?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }
