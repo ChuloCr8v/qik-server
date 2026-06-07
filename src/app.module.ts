@@ -34,6 +34,7 @@ import { UsageModule } from './usage/usage.module';
 import { getJwtSecret } from './config/env';
 import { HealthController } from './health.controller';
 import { AdminModule } from './admin/admin.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module( {
   imports: [
@@ -60,6 +61,7 @@ import { AdminModule } from './admin/admin.module';
     TeamModule,
     AiModule,
     AdminModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [HealthController],
 })
