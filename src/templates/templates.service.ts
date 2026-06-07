@@ -1,9 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PlanType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlanService } from '../plan/plan.service';
+
+const FREE_PLANS: PlanType[] = [PlanType.Free];
 
 @Injectable()
 export class TemplatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly planService: PlanService,
+  ) {}
 
   async list(userId: string) {
     const templates = await this.prisma.template.findMany({ where: { ownerId: userId }, orderBy: { createdAt: 'desc' } });
@@ -11,6 +18,11 @@ export class TemplatesService {
   }
 
   async create(userId: string, body: any) {
+    const { plan } = await this.planService.getEffectiveLimits(userId);
+    if (FREE_PLANS.includes(plan.type)) {
+      throw new ForbiddenException('Saving custom templates requires a paid plan. Please upgrade to Individual, Organisation, or OrganisationPlus.');
+    }
+
     const template = await this.prisma.template.create({
       data: {
         ownerId: userId,
