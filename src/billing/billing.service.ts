@@ -369,6 +369,7 @@ export class BillingService {
     if (!priceId) {
       throw new BadRequestException(`Stripe price is not configured for ${planType}.`);
     }
+    console.log(priceId)
     return priceId;
   }
 

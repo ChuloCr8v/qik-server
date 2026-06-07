@@ -2,15 +2,15 @@ import {
   BadRequestException,
   Injectable,
   UnauthorizedException,
-} from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
-import { Prisma } from "@prisma/client";
-import { createHash, randomInt } from "crypto";
-import { PrismaService } from "../prisma/prisma.service";
-import { MailService } from "../mail/mail.service";
-import { getAnimeAvatar } from "../common/avatar";
-import { getJwtSecret } from "../config/env";
-import { isValidEmail, normalizeEmail } from "../common/email";
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
+import { createHash, randomInt } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
+import { getAnimeAvatar } from '../common/avatar';
+import { getJwtSecret } from '../config/env';
+import { isValidEmail, normalizeEmail } from '../common/email';
 
 type GoogleTokenInfo = {
   aud?: string;
@@ -33,7 +33,7 @@ export class AuthService {
     try {
       const email = normalizeEmail(input.email);
       if (!isValidEmail(email)) {
-        throw new BadRequestException("A valid email address is required.");
+        throw new BadRequestException('A valid email address is required.');
       }
 
       await this.cleanupLoginCodes(email);
@@ -51,42 +51,49 @@ export class AuthService {
         },
       });
 
-      // await this.mailService.sendSignInCode({ to: email, code, expiresInMinutes });
+      await this.mailService.sendSignInCode({
+        to: email,
+        code,
+        expiresInMinutes,
+      });
 
       return {
         ok: true,
-        message: "Sign-in code sent.",
+        message: 'Sign-in code sent.',
         ...(this.shouldExposeDevCode() ? { devCode: code } : {}),
       };
-    } catch (error) {
-      console.error(error);
-      throw new BadRequestException("Failed to send sign-in code.");
+    } catch (e) {
+      console.log(e);
+      throw e;
     }
   }
 
   async verifyEmailSignIn(input: { email: string; code: string }) {
     const email = normalizeEmail(input.email);
     const code = input.code?.trim();
+
     if (!isValidEmail(email) || !code) {
-      throw new BadRequestException("Email and sign-in code are required.");
+      throw new BadRequestException('Email and sign-in code are required.');
     }
 
     const loginCode = await this.prisma.loginCode.findUnique({
       where: { codeHash: this.hashCode(email, code) },
     });
+
     if (
       !loginCode ||
       loginCode.email !== email ||
       loginCode.usedAt ||
       loginCode.expiresAt < new Date()
     ) {
-      throw new UnauthorizedException("Invalid or expired sign-in code.");
+      throw new UnauthorizedException('Invalid or expired sign-in code.');
     }
 
     await this.prisma.loginCode.update({
       where: { id: loginCode.id },
       data: { usedAt: new Date() },
     });
+
     await this.cleanupLoginCodes(email);
 
     const user = await this.findOrCreateEmailUser({
@@ -105,35 +112,42 @@ export class AuthService {
   }
 
   async googleSignIn(input: { credential: string }) {
-    const credential = input.credential?.trim();
-    if (!credential) {
-      throw new BadRequestException("Google credential is required.");
-    }
+    try {
+      const credential = input.credential?.trim();
+      if (!credential) {
+        throw new BadRequestException('Google credential is required.');
+      }
 
-    const profile = await this.verifyGoogleCredential(credential);
-    if (!profile.email || !profile.sub) {
-      throw new UnauthorizedException("Google account could not be verified.");
-    }
+      const profile = await this.verifyGoogleCredential(credential);
 
-    const email = normalizeEmail(profile.email);
-    const user = await this.findOrCreateEmailUser({
-      email,
-      update: {
-        normalizedEmail: email,
-        googleId: profile.sub,
-        emailVerified: true,
-        displayName: profile.name || this.defaultDisplayName(email),
-      },
-      create: {
+      if (!profile.email || !profile.sub) {
+        throw new UnauthorizedException('Google account could not be verified.');
+      }
+
+      const email = normalizeEmail(profile.email);
+      const user = await this.findOrCreateEmailUser({
         email,
-        normalizedEmail: email,
-        googleId: profile.sub,
-        emailVerified: true,
-        displayName: profile.name || this.defaultDisplayName(email),
-        photoUrl: getAnimeAvatar(email),
-      },
-    });
-    return this.authResponse(await this.ensureAnimeAvatar(user));
+        update: {
+          normalizedEmail: email,
+          googleId: profile.sub,
+          emailVerified: true,
+          displayName: profile.name || this.defaultDisplayName(email),
+        },
+        create: {
+          email,
+          normalizedEmail: email,
+          googleId: profile.sub,
+          emailVerified: true,
+          displayName: profile.name || this.defaultDisplayName(email),
+          photoUrl: getAnimeAvatar(email),
+        },
+      });
+
+      return this.authResponse(await this.ensureAnimeAvatar(user));
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
   }
 
   async me(userId: string) {
@@ -145,7 +159,10 @@ export class AuthService {
 
   private authResponse(user: any) {
     const token = this.jwtService.sign({ id: user.id, email: user.email });
-    return { token, user: this.serializeUser(user) };
+    return {
+      token,
+      user: this.serializeUser(user),
+    };
   }
 
   private serializeUser(user: any) {
@@ -178,19 +195,15 @@ export class AuthService {
 
   private hashCode(email: string, code: string) {
     const secret = getJwtSecret();
-    return createHash("sha256")
-      .update(`${email}:${code}:${secret}`)
-      .digest("hex");
+    return createHash('sha256').update(`${email}:${code}:${secret}`).digest('hex');
   }
 
   private defaultDisplayName(email: string) {
-    return email.split("@")[0];
+    return email.split('@')[0];
   }
 
   private async ensureAnimeAvatar(user: any) {
-    if (user.photoUrl) {
-      return user;
-    }
+    if (user.photoUrl) return user;
 
     return this.prisma.user.update({
       where: { id: user.id },
@@ -199,10 +212,7 @@ export class AuthService {
   }
 
   private shouldExposeDevCode() {
-    return (
-      process.env.NODE_ENV !== "production" &&
-      process.env.AUTH_EXPOSE_DEV_CODE !== "false"
-    );
+    return process.env.NODE_ENV !== 'production' && process.env.AUTH_EXPOSE_DEV_CODE !== 'false';
   }
 
   private async cleanupLoginCodes(email?: string) {
@@ -235,11 +245,7 @@ export class AuthService {
     if (existing) {
       return this.prisma.user.update({
         where: { id: existing.id },
-        data: {
-          ...input.update,
-          email: input.email,
-          normalizedEmail: input.email,
-        },
+        data: { ...input.update, email: input.email, normalizedEmail: input.email },
       });
     }
 
@@ -248,24 +254,23 @@ export class AuthService {
 
   private async verifyGoogleCredential(credential: string) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    if (!clientId || clientId === "YOUR_GOOGLE_OAUTH_CLIENT_ID") {
-      throw new BadRequestException("Google sign-in is not configured.");
+    if (!clientId || clientId === 'YOUR_GOOGLE_OAUTH_CLIENT_ID') {
+      throw new BadRequestException('Google sign-in is not configured.');
     }
 
     const response = await fetch(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
     );
-    if (!response.ok) {
-      throw new UnauthorizedException("Invalid Google credential.");
-    }
+    if (!response.ok) throw new UnauthorizedException('Invalid Google credential.');
 
     const profile = (await response.json()) as GoogleTokenInfo;
+
     if (
       profile.aud !== clientId ||
       profile.email_verified === false ||
-      profile.email_verified === "false"
+      profile.email_verified === 'false'
     ) {
-      throw new UnauthorizedException("Google account could not be verified.");
+      throw new UnauthorizedException('Google account could not be verified.');
     }
 
     return profile;
